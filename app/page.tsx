@@ -1,65 +1,171 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+
+// Animation variants for staggering form elements
+const formContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const formItemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: { y: 0, opacity: 1 },
+};
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    // Simulate an API call
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // In a real app, you'd handle authentication here.
+    // For now, we'll just navigate to the dashboard.
+    // You could add mock error handling like:
+    // const formData = new FormData(e.currentTarget);
+    // if (formData.get('password') === 'fail') {
+    //   setError("Invalid email or password.");
+    //   setIsLoading(false);
+    //   return;
+    // }
+
+    router.push("/dashboard");
+    // In a real app, you wouldn't set isLoading to false on success
+    // because the page will be unmounted.
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+      {/* Left side - Branding and Visuals */}
+      <div className="hidden bg-muted lg:flex lg:items-center lg:justify-center">
+        <div className="text-center">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 120, delay: 0.2 }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Lock size={80} className="mx-auto text-primary" />
+          </motion.div>
+          <motion.h1
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6 text-4xl font-bold tracking-tight"
           >
-            Documentation
-          </a>
+            Smart Lock Admin Panel
+          </motion.h1>
+          <motion.p
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="mt-2 text-lg text-muted-foreground"
+          >
+            Centralized Management for Your Smart Locks
+          </motion.p>
         </div>
-      </main>
+      </div>
+
+      {/* Right side - Login Form */}
+      <div className="flex items-center justify-center py-12 min-h-screen">
+        <motion.div
+          className="mx-auto grid w-[350px] gap-6"
+          variants={formContainerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div
+            className="grid gap-2 text-center"
+            variants={formItemVariants}
+          >
+            <h1 className="text-3xl font-bold">Login</h1>
+            <p className="text-balance text-muted-foreground">
+              Enter your credentials to access the dashboard
+            </p>
+          </motion.div>
+
+          <form onSubmit={handleLogin} className="grid gap-4">
+            <motion.div className="grid gap-2" variants={formItemVariants}>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                required
+                disabled={isLoading}
+              />
+            </motion.div>
+
+            <motion.div
+              className="grid gap-2 relative"
+              variants={formItemVariants}
+            >
+              <div className="flex items-center">
+                <Label htmlFor="password">Password</Label>
+              </div>
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                required
+                disabled={isLoading}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 bottom-1 h-7 w-7"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                <span className="sr-only">Toggle password visibility</span>
+              </Button>
+            </motion.div>
+
+            {/* Error Message Display */}
+            {error && (
+              <motion.div
+                className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <AlertCircle className="h-4 w-4" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
+            <motion.div variants={formItemVariants}>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading ? "Signing In..." : "Sign In"}
+              </Button>
+            </motion.div>
+          </form>
+        </motion.div>
+      </div>
     </div>
   );
 }
