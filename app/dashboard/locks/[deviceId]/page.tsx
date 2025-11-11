@@ -24,8 +24,7 @@ export default async function LockDetailPage({
 }) {
   const { deviceId } = await params;
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const deviceRes = await fetch(`${baseUrl}/api/devices/${deviceId}/details`, {
+  const deviceRes = await fetch(`/api/devices/${deviceId}/details`, {
     cache: "no-store",
   });
 
