@@ -1,4 +1,3 @@
-// src/components/LogDetailDialog.tsx
 "use client";
 
 import {
@@ -29,13 +28,16 @@ interface MediaInfo {
   file_url: string;
 }
 
+interface DeviceStatus {
+  code: string;
+  value: string | number | boolean;
+}
+
 interface LogDetail {
   update_time: number;
   nick_name?: string;
   user_id?: string;
-  status:
-    | { code: string; value: string | any }
-    | { code: string; value: string }[];
+  status: DeviceStatus | DeviceStatus[];
   media_infos?: MediaInfo[];
 }
 
@@ -54,9 +56,7 @@ export default function LogDetailDialog({
 }: LogDetailDialogProps) {
   const isAlarm = "media_infos" in log || Array.isArray(log.status);
   const statusArray = Array.isArray(log.status) ? log.status : [log.status];
-  const primaryStatus = statusArray[0];
 
-  // Fetch real-time media URL (signed) if file_key exists
   const mediaInfo = log.media_infos?.[0];
   const { data: mediaUrlData, isLoading: mediaLoading } = useSWR<{
     success: boolean;
@@ -90,7 +90,6 @@ export default function LogDetailDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* User & Time */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-muted rounded-full w-12 h-12 flex items-center justify-center">
@@ -116,7 +115,6 @@ export default function LogDetailDialog({
             </div>
           </div>
 
-          {/* Event Details */}
           <div className="space-y-3">
             <h4 className="font-medium flex items-center gap-2">
               <AlertTriangle className="h-5 w-5" />
@@ -131,7 +129,7 @@ export default function LogDetailDialog({
                   <Badge variant={isAlarm ? "destructive" : "default"}>
                     {eventMap[s.code] || s.code}
                   </Badge>
-                  {s.value && s.value !== true && (
+                  {s.value !== true && s.value !== false && (
                     <p className="text-sm text-muted-foreground mt-1">
                       Value: {String(s.value)}
                     </p>
@@ -141,7 +139,6 @@ export default function LogDetailDialog({
             ))}
           </div>
 
-          {/* Media */}
           {mediaInfo && (
             <div className="space-y-3">
               <h4 className="font-medium flex items-center gap-2">

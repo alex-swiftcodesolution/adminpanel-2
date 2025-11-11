@@ -1,4 +1,3 @@
-// src/app/dashboard/locks/[deviceId]/LockDetailClient.tsx
 "use client";
 
 import { useState } from "react";
@@ -31,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertCircle,
   Battery,
   Lock,
   Unlock,
@@ -47,12 +45,18 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import LogDetailDialog from "@/components/ui/LogDetailDialog";
 
-interface Device {
+interface DeviceStatus {
+  code: string;
+  value: string | number | boolean;
+}
+
+interface TuyaDevice {
   id: string;
   name: string;
   is_online: boolean;
-  status?: { code: string; value: any }[];
+  status?: DeviceStatus[];
 }
+
 interface User {
   user_id: string;
   nick_name: string;
@@ -60,19 +64,21 @@ interface User {
   role: "admin" | "normal";
 }
 
-// Unified Log Type (supports both unlock & alarm)
 interface BaseLog {
   update_time: number;
   user_id?: string;
   nick_name?: string;
 }
+
 interface UnlockLog extends BaseLog {
-  status: { code: string; value: any };
+  status: DeviceStatus;
 }
+
 interface AlarmLog extends BaseLog {
-  status: { code: string; value: any }[] | { code: string; value: any };
+  status: DeviceStatus[] | DeviceStatus;
   media_infos?: Array<{ file_key: string; file_url: string }>;
 }
+
 type Log = UnlockLog | AlarmLog;
 
 const endTime = Date.now();
@@ -83,24 +89,22 @@ export default function LockDetailClient({
   initialDevice,
 }: {
   deviceId: string;
-  initialDevice: Device;
+  initialDevice: TuyaDevice;
 }) {
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({ nick_name: "", sex: "male" });
-
-  // Dialog state
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const { data: deviceData } = useSWR<{ result: Device }>(
+  const { data: deviceData } = useSWR<{ result: TuyaDevice }>(
     `/api/devices/${deviceId}/details`,
     fetcher,
     { fallbackData: { result: initialDevice } }
   );
 
   const { data: statusData, mutate: mutateStatus } = useSWR<{
-    result: { code: string; value: any }[];
+    result: DeviceStatus[];
   }>(`/api/devices/${deviceId}/status`, fetcher, { refreshInterval: 10000 });
 
   const { data: usersData, mutate: mutateUsers } = useSWR<{ result: User[] }>(
@@ -134,8 +138,8 @@ export default function LockDetailClient({
       await postApi(`/api/devices/${deviceId}/unlock`, {});
       toast.success("Door unlocked remotely!");
       mutateStatus();
-    } catch (err: any) {
-      toast.error(err.message || "Unlock failed");
+    } catch {
+      toast.error("Unlock failed");
     } finally {
       setUnlockLoading(false);
     }
@@ -149,8 +153,8 @@ export default function LockDetailClient({
       setAddUserOpen(false);
       setNewUser({ nick_name: "", sex: "male" });
       mutateUsers();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to add user");
+    } catch {
+      toast.error("Failed to add user");
     }
   };
 
@@ -519,7 +523,6 @@ export default function LockDetailClient({
         </TabsContent>
       </Tabs>
 
-      {/* REUSABLE LOG DETAIL DIALOG */}
       {selectedLog && (
         <LogDetailDialog
           log={selectedLog}

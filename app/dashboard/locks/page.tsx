@@ -1,8 +1,8 @@
 // src/app/dashboard/locks/page.tsx
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -21,7 +21,7 @@ import { fetcher } from "@/lib/api-client";
 
 interface DeviceStatus {
   code: string;
-  value: any;
+  value: string | number | boolean;
 }
 
 interface TuyaDevice {
@@ -89,7 +89,6 @@ export default function LocksPage() {
     "/api/devices",
     fetcher
   );
-  const [unlocking, setUnlocking] = useState<string | null>(null);
 
   if (isLoading) return <LocksSkeleton />;
   if (error || !data?.success) {
@@ -156,7 +155,9 @@ export default function LocksPage() {
                     s.code === "battery_state"
                 );
                 const batteryLevel =
-                  battery?.code === "battery_percentage" ? battery.value : null;
+                  battery?.code === "battery_percentage"
+                    ? Number(battery.value)
+                    : null;
                 const isLow = battery?.value === "low";
 
                 return (
@@ -168,10 +169,12 @@ export default function LocksPage() {
                       >
                         <div className="relative">
                           {device.icon_url ? (
-                            <img
+                            <Image
                               src={device.icon_url}
                               alt={device.name}
-                              className="h-10 w-10 rounded-lg object-contain"
+                              width={40}
+                              height={40}
+                              className="rounded-lg object-contain"
                             />
                           ) : (
                             <div className="bg-muted border-2 border-dashed rounded-lg w-10 h-10 flex items-center justify-center">
