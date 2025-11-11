@@ -1,3 +1,4 @@
+// src/app/dashboard/locks/[deviceId]/LockDetailClient.tsx
 "use client";
 
 import { useState } from "react";
@@ -31,12 +32,16 @@ import {
 } from "@/components/ui/select";
 import {
   Battery,
+  BatteryLow,
   Lock,
   Unlock,
   Key,
   UserPlus,
   Trash2,
   BellRing,
+  Wifi,
+  WifiOff,
+  MoreVertical,
 } from "lucide-react";
 import useSWR from "swr";
 import { fetcher, postApi } from "@/lib/api-client";
@@ -129,6 +134,7 @@ export default function LockDetailClient({
     statusData?.result?.map((s) => [s.code, s.value]) || []
   );
   const battery = statusMap.battery_percentage ?? statusMap.battery_state;
+  const batteryLevel = typeof battery === "number" ? battery : null;
   const isLocked =
     statusMap.lock_state === "locked" || statusMap.door_state === "closed";
 
@@ -191,26 +197,37 @@ export default function LockDetailClient({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Lock className="h-8 w-8" />
-            {device.name}
+    <div className="space-y-6 pb-8">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+            <Lock className="h-7 w-7 sm:h-8 sm:w-8" />
+            <span className="truncate">{device.name}</span>
           </h1>
-          <p className="text-muted-foreground mt-1">ID: {device.id}</p>
+          <p className="text-muted-foreground text-sm mt-1 break-all">
+            ID: {device.id}
+          </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
           <Badge
             variant={device.is_online ? "default" : "secondary"}
-            className="text-lg px-4"
+            className="w-fit text-sm px-3 py-1.5 flex items-center gap-1.5"
           >
-            {device.is_online ? "Online" : "Offline"}
+            {device.is_online ? (
+              <Wifi className="h-3.5 w-3.5" />
+            ) : (
+              <WifiOff className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden xs:inline">
+              {device.is_online ? "Online" : "Offline"}
+            </span>
           </Badge>
           <Button
             size="lg"
             onClick={handleRemoteUnlock}
             disabled={unlockLoading || !device.is_online}
+            className="w-full sm:w-auto"
           >
             <Unlock className="h-5 w-5 mr-2" />
             {unlockLoading ? "Unlocking..." : "Remote Unlock"}
@@ -219,17 +236,25 @@ export default function LockDetailClient({
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="users" className="text-xs sm:text-sm">
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="text-xs sm:text-sm">
+            Logs
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="text-xs sm:text-sm">
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Card>
-              <CardHeader className="flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
                   Door State
                 </CardTitle>
@@ -247,14 +272,18 @@ export default function LockDetailClient({
             </Card>
 
             <Card>
-              <CardHeader className="flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Battery</CardTitle>
-                <Battery className="h-5 w-5 text-muted-foreground" />
+                {batteryLevel !== null && batteryLevel < 20 ? (
+                  <BatteryLow className="h-5 w-5 text-destructive" />
+                ) : (
+                  <Battery className="h-5 w-5 text-green-600" />
+                )}
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {typeof battery === "number"
-                    ? `${battery}%`
+                  {batteryLevel !== null
+                    ? `${batteryLevel}%`
                     : battery === "low"
                     ? "Low"
                     : "Normal"}
@@ -263,7 +292,7 @@ export default function LockDetailClient({
             </Card>
 
             <Card>
-              <CardHeader className="flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">
                   Total Users
                 </CardTitle>
@@ -280,16 +309,16 @@ export default function LockDetailClient({
 
         <TabsContent value="users">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Lock Users</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-lg">Lock Users</CardTitle>
                 <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button size="sm">
                       <UserPlus className="h-4 w-4 mr-2" /> Add User
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle>Add New User</DialogTitle>
                     </DialogHeader>
@@ -304,6 +333,7 @@ export default function LockDetailClient({
                               nick_name: e.target.value,
                             })
                           }
+                          placeholder="Enter name"
                         />
                       </div>
                       <div>
@@ -331,178 +361,306 @@ export default function LockDetailClient({
                 </Dialog>
               </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {usersData?.result?.map((user) => (
-                    <TableRow key={user.user_id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-xs">
-                            {user.nick_name[0] || "?"}
-                          </div>
-                          <div>
-                            <div className="font-medium">
-                              {user.nick_name || "Unnamed"}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {user.user_id}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={user.role}
-                          onValueChange={(v) =>
-                            handleRoleChange(
-                              user.user_id,
-                              v as "admin" | "normal"
-                            )
-                          }
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="normal">Normal</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteUser(user.user_id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+            <CardContent className="p-0">
+              {/* Mobile Card View */}
+              <div className="block sm:hidden">
+                {usersData?.result?.map((user) => (
+                  <div
+                    key={user.user_id}
+                    className="border-b last:border-b-0 p-4 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-sm font-medium">
+                        {user.nick_name[0] || "?"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">
+                          {user.nick_name || "Unnamed"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.user_id}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={user.role}
+                        onValueChange={(v) =>
+                          handleRoleChange(
+                            user.user_id,
+                            v as "admin" | "normal"
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-24 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteUser(user.user_id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {usersData?.result?.map((user) => (
+                      <TableRow key={user.user_id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-xs">
+                              {user.nick_name[0] || "?"}
+                            </div>
+                            <div>
+                              <div className="font-medium">
+                                {user.nick_name || "Unnamed"}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {user.user_id}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={user.role}
+                            onValueChange={(v) =>
+                              handleRoleChange(
+                                user.user_id,
+                                v as "admin" | "normal"
+                              )
+                            }
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteUser(user.user_id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="logs">
           <Tabs defaultValue="unlock">
-            <TabsList className="mb-4">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
               <TabsTrigger value="unlock">Unlock Logs</TabsTrigger>
               <TabsTrigger value="alarm">Alarms</TabsTrigger>
             </TabsList>
 
             <TabsContent value="unlock">
               <Card>
-                <CardHeader>
-                  <CardTitle>Unlock History</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Unlock History</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Method</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {unlockLogs?.result?.logs?.length === 0 ? (
+                <CardContent className="p-0">
+                  {/* Mobile List */}
+                  <div className="block sm:hidden">
+                    {unlockLogs?.result?.logs?.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        No unlock events in last 7 days
+                      </div>
+                    ) : (
+                      unlockLogs?.result?.logs?.map((log) => (
+                        <div
+                          key={log.update_time}
+                          onClick={() => openLogDetail(log)}
+                          className="border-b last:border-b-0 p-4 hover:bg-muted/50 cursor-pointer"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-sm">
+                                {log.nick_name || `ID: ${log.user_id}`}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {format(log.update_time, "MMM d, h:mm a")}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {eventMap[log.status.code] || log.status.code}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell
-                            colSpan={3}
-                            className="text-center text-muted-foreground py-8"
-                          >
-                            No unlock events in last 7 days
-                          </TableCell>
+                          <TableHead>Time</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Method</TableHead>
                         </TableRow>
-                      ) : (
-                        unlockLogs?.result?.logs?.map((log) => (
-                          <TableRow
-                            key={log.update_time}
-                            className="cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => openLogDetail(log)}
-                          >
-                            <TableCell>
-                              {format(log.update_time, "MMM d, h:mm a")}
-                            </TableCell>
-                            <TableCell>
-                              {log.nick_name || `ID: ${log.user_id}`}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {eventMap[log.status.code] || log.status.code}
-                              </Badge>
+                      </TableHeader>
+                      <TableBody>
+                        {unlockLogs?.result?.logs?.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={3}
+                              className="text-center text-muted-foreground py-8"
+                            >
+                              No unlock events in last 7 days
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          unlockLogs?.result?.logs?.map((log) => (
+                            <TableRow
+                              key={log.update_time}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => openLogDetail(log)}
+                            >
+                              <TableCell>
+                                {format(log.update_time, "MMM d, h:mm a")}
+                              </TableCell>
+                              <TableCell>
+                                {log.nick_name || `ID: ${log.user_id}`}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {eventMap[log.status.code] || log.status.code}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="alarm">
               <Card>
-                <CardHeader>
-                  <CardTitle>Alarm Events</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Alarm Events</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Event</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {alarmLogs?.result?.logs?.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={2}
-                            className="text-center text-muted-foreground py-8"
-                          >
-                            No alarms in last 7 days
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        alarmLogs?.result?.logs?.map((log) => {
-                          const statusArray = Array.isArray(log.status)
-                            ? log.status
-                            : [log.status];
-                          const primaryCode = statusArray[0].code;
-                          const hasMedia = !!log.media_infos?.length;
+                <CardContent className="p-0">
+                  {/* Mobile List */}
+                  <div className="block sm:hidden">
+                    {alarmLogs?.result?.logs?.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        No alarms in last 7 days
+                      </div>
+                    ) : (
+                      alarmLogs?.result?.logs?.map((log) => {
+                        const statusArray = Array.isArray(log.status)
+                          ? log.status
+                          : [log.status];
+                        const primaryCode = statusArray[0].code;
+                        const hasMedia = !!log.media_infos?.length;
 
-                          return (
-                            <TableRow
-                              key={log.update_time}
-                              className="cursor-pointer hover:bg-muted/50 transition-colors"
-                              onClick={() => openLogDetail(log)}
+                        return (
+                          <div
+                            key={log.update_time}
+                            onClick={() => openLogDetail(log)}
+                            className="border-b last:border-b-0 p-4 hover:bg-muted/50 cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-sm text-destructive flex items-center gap-2">
+                                  <BellRing className="h-4 w-4" />
+                                  {eventMap[primaryCode] || primaryCode}
+                                  {hasMedia && " (Media)"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {format(log.update_time, "MMM d, h:mm a")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Event</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {alarmLogs?.result?.logs?.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={2}
+                              className="text-center text-muted-foreground py-8"
                             >
-                              <TableCell>
-                                {format(log.update_time, "MMM d, h:mm a")}
-                              </TableCell>
-                              <TableCell className="text-destructive">
-                                <BellRing className="inline h-4 w-4 mr-2" />
-                                {eventMap[primaryCode] || primaryCode}
-                                {hasMedia && " (Photo/Video)"}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
+                              No alarms in last 7 days
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          alarmLogs?.result?.logs?.map((log) => {
+                            const statusArray = Array.isArray(log.status)
+                              ? log.status
+                              : [log.status];
+                            const primaryCode = statusArray[0].code;
+                            const hasMedia = !!log.media_infos?.length;
+
+                            return (
+                              <TableRow
+                                key={log.update_time}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => openLogDetail(log)}
+                              >
+                                <TableCell>
+                                  {format(log.update_time, "MMM d, h:mm a")}
+                                </TableCell>
+                                <TableCell className="text-destructive">
+                                  <BellRing className="inline h-4 w-4 mr-2" />
+                                  {eventMap[primaryCode] || primaryCode}
+                                  {hasMedia && " (Photo/Video)"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

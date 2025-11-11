@@ -1,3 +1,4 @@
+// src/app/dashboard/locks/[deviceId]/page.tsx
 import { notFound } from "next/navigation";
 import LockDetailClient from "./LockDetailClient";
 
