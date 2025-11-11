@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const eventMap: { [key: string]: string } = {
+export const eventMap: Record<string, string> = {
   // Unlock Events
   unlock_fingerprint: "Unlocked with Fingerprint",
   unlock_password: "Unlocked with Password",
@@ -16,17 +16,26 @@ export const eventMap: { [key: string]: string } = {
   unlock_key: "Unlocked with Mechanical Key",
   unlock_identity_card: "Unlocked with ID Card",
   unlock_emergency: "Unlocked with Emergency Code",
-  unlock: "Unlocked Remotely", // Generic unlock
+  unlock: "Unlocked Remotely",
 
   // Lock Events
   lock: "Locked",
 
-  // Alarms
+  // ALARMS – MATCH TUYA v1.1 EXACTLY
+  alarm_lock: "Lock Alarm",
+  alarm_battery_low: "Battery Low",
+  alarm_tamper: "Tamper Detected",
+  alarm_duress: "Duress Alarm",
+  alarm_break_in: "Break-in Detected",
+  alarm_vibration: "Vibration Detected",
+  alarm_door_open: "Door Left Open",
+
+  // Legacy fallback
   tamper: "Tamper Alarm",
-  doorbell: "Doorbell Pressed",
   hijack: "Duress Alarm",
   low_battery: "Low Battery",
-  wrong_finger: "Wrong Fingerprint",
+
+  doorbell: "Doorbell Pressed",
+
   wrong_password: "Wrong Password",
-  wrong_card: "Wrong Card",
 };

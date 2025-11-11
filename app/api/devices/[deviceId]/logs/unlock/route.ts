@@ -1,5 +1,4 @@
 // src/app/api/devices/[deviceId]/logs/unlock/route.ts
-
 import { NextResponse } from "next/server";
 import { tuyaClient } from "@/lib/tuya-connector";
 
@@ -10,15 +9,16 @@ export async function GET(
   const { deviceId } = await context.params;
   const { searchParams } = new URL(request.url);
 
-  if (!searchParams.has("page_no") || !searchParams.has("page_size")) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Query parameters 'page_no' and 'page_size' are required.",
-      },
-      { status: 400 }
-    );
+  // Tuya REQUIRES start_time & end_time → auto-fill if missing
+  if (!searchParams.has("start_time") || !searchParams.has("end_time")) {
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 604800000;
+    searchParams.set("start_time", sevenDaysAgo.toString());
+    searchParams.set("end_time", now.toString());
   }
+
+  if (!searchParams.has("page_no")) searchParams.set("page_no", "1");
+  if (!searchParams.has("page_size")) searchParams.set("page_size", "20");
 
   try {
     const response = await tuyaClient.request({
@@ -34,11 +34,10 @@ export async function GET(
         { status: 502 }
       );
     }
-
     return NextResponse.json({ success: true, result });
   } catch (error: unknown) {
     const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred";
+      error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       { success: false, message: errorMessage },
       { status: 500 }
