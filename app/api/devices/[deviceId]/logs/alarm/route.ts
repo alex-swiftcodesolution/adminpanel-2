@@ -1,12 +1,14 @@
-// src/app/api/devices/[deviceId]/logs/alarm/route.ts
 import { NextResponse } from "next/server";
 import { tuyaClient } from "@/lib/tuya-connector";
 
+type AlarmStatusItem = { code: string; value: unknown };
+
+// v1.1 returns status as an array of objects.
 interface AlarmRecord {
-  media_infos?: Array<{ file_key: string; file_url: string }>;
-  nick_name: string;
-  status: Array<{ code: string; value: string }>;
-  update_time: number;
+  media_infos?: { file_key: string; file_url: string }[];
+  nick_name?: string;
+  status: AlarmStatusItem[];
+  update_time: number; // Unix timestamp in milliseconds
 }
 
 interface TuyaAlarmResult {
@@ -14,54 +16,64 @@ interface TuyaAlarmResult {
   total: number;
 }
 
-interface TuyaAlarmResponse {
-  result: TuyaAlarmResult;
+interface TuyaResponse<T> {
+  result: T;
   success: boolean;
   msg?: string;
   code?: number;
 }
 
-const VALID_ALARM_CODES =
-  "alarm_lock,alarm_battery_low,alarm_tamper,alarm_duress,alarm_break_in,alarm_vibration,alarm_door_open";
+// Per v1.1 docs, these are valid alarm codes
+const DEFAULT_ALARM_CODES = "alarm_lock,hijack,doorbell";
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ deviceId: string }> }
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
-  const { deviceId } = await context.params;
+  const { deviceId } = await params;
+
   const url = new URL(request.url);
   const searchParams = url.searchParams;
 
-  searchParams.set("codes", VALID_ALARM_CODES);
-  searchParams.set("show_media_info", "true");
-  searchParams.set("page_no", "1");
-  searchParams.set("page_size", "10");
-
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  searchParams.set("start_time", sevenDaysAgo.toString());
-  searchParams.set("end_time", now.toString());
+  // Build query based on the v1.1 documentation
+  const query = {
+    page_no: searchParams.get("page_no") ?? "1",
+    page_size: searchParams.get("page_size") ?? "10",
+    codes: searchParams.get("codes") ?? DEFAULT_ALARM_CODES,
+    show_media_info: searchParams.get("show_media_info") ?? "false", // Required boolean parameter
+  };
 
   try {
-    const response = await tuyaClient.request<TuyaAlarmResponse>({
+    // Corrected to use the v1.1 endpoint
+    const response = await tuyaClient.request<TuyaAlarmResult>({
       method: "GET",
       path: `/v1.1/devices/${deviceId}/door-lock/alarm-logs`,
-      query: Object.fromEntries(searchParams.entries()),
+      query,
     });
 
-    const { result, success, msg } = response.data;
+    const data = response.data as TuyaResponse<TuyaAlarmResult>;
+    const { result, success, msg } = data;
 
     if (!success) {
+      console.error("Tuya alarm-logs error:", data);
       return NextResponse.json(
         { success: false, message: msg || "Tuya API error" },
         { status: 502 }
       );
     }
 
+    // v1.1 status is already an array, so no normalization is needed.
+    // The previous normalization logic is kept for safety but is less critical now.
+    const logs = (result.records ?? []).map((r) => ({
+      ...r,
+      status: Array.isArray(r.status) ? r.status : [r.status],
+    }));
+
     return NextResponse.json({
       success: true,
       result: {
-        logs: result.records || [],
+        logs,
+        total: result.total ?? 0,
       },
     });
   } catch (error: unknown) {

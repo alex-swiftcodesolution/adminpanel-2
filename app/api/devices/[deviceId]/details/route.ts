@@ -2,39 +2,39 @@
 import { NextResponse } from "next/server";
 import { tuyaClient } from "@/lib/tuya-connector";
 
-interface TuyaDeviceResult {
+type TuyaResponse<T> = {
+  success: boolean;
+  msg?: string;
+  result: T;
+};
+
+type TuyaDeviceResult = {
   id: string;
   name: string;
-  is_online: boolean;
+  is_online?: boolean;
+  online?: boolean;
   category?: string;
   product_name?: string;
   model?: string;
   ip?: string;
   icon?: string;
   [extra: string]: unknown;
-}
-
-interface TuyaDeviceResponse {
-  result: TuyaDeviceResult;
-  success: boolean;
-  msg?: string;
-}
+};
 
 export async function GET(
-  request: Request,
-  context: { params: Promise<{ deviceId: string }> }
+  _request: Request,
+  { params }: { params: Promise<{ deviceId: string }> }
 ) {
-  const { deviceId } = await context.params;
+  const { deviceId } = await params;
 
   try {
-    const response = await tuyaClient.request<TuyaDeviceResponse>({
+    const response = await tuyaClient.request<TuyaDeviceResult>({
       method: "GET",
       path: `/v2.0/cloud/thing/${deviceId}`,
     });
 
-    const { result, success, msg } = response.data;
-
-    console.log("Tuya Device Details Response:", response.data);
+    const { result, success, msg } =
+      response.data as TuyaResponse<TuyaDeviceResult>;
 
     if (!success) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function GET(
       success: true,
       result: {
         ...result,
-        online: result.is_online, // now fully typed
+        online: result.is_online ?? result.online ?? false,
       },
     });
   } catch (error: unknown) {

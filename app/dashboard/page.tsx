@@ -1,9 +1,17 @@
 // src/app/dashboard/page.tsx
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, BatteryWarning, Lock, Wifi, KeyRound } from "lucide-react";
+import {
+  Activity,
+  BatteryWarning,
+  Lock,
+  Wifi,
+  KeyRound,
+  ShieldAlert, // <-- Import new icon for alarms
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,8 +25,9 @@ import Image from "next/image";
 import { eventMap } from "@/lib/utils";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api-client";
+import React from "react";
 
-// --- NEW: Define types for our API data to eliminate 'any' ---
+// --- UPDATED: Define types for API data ---
 interface DeviceStatus {
   code: string;
   value: string | number | boolean;
@@ -38,7 +47,24 @@ interface UnlockLog {
   avatar?: string;
   status: DeviceStatus;
 }
-// --- END OF NEW TYPES ---
+
+// NEW: Define type for Alarm Logs based on the v1.1 API
+interface AlarmLog {
+  update_time: number;
+  nick_name?: string; // Often empty for alarms
+  status: DeviceStatus[]; // Note: this is an array
+}
+
+// NEW: Define a unified structure for rendering
+interface UnifiedEvent {
+  id: string | number;
+  timestamp: number;
+  actor: string;
+  avatar?: string;
+  event: string;
+  Icon: React.ElementType; // Use a dynamic icon component
+}
+// --- END OF TYPE DEFINITIONS ---
 
 // Animation variants
 const container = {
@@ -47,13 +73,12 @@ const container = {
 };
 const item = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } };
 
-// --- CORRECTED: Define timestamps as module-level constants ---
-// This ensures they are calculated only once when the module is loaded, satisfying the purity rule.
+// Timestamps for unlock logs
 const endTime = Date.now();
 const startTime = endTime - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-// --- END OF CORRECTION ---
 
 function DashboardSkeleton() {
+  // ... (skeleton component remains the same)
   return (
     <div className="space-y-6">
       <Skeleton className="h-9 w-48" />
@@ -93,17 +118,76 @@ export default function DashboardPage() {
 
   const firstDeviceId = devicesData?.result?.[0]?.id;
 
-  const logsSWRKey = firstDeviceId
-    ? `/api/devices/${firstDeviceId}/logs/unlock?page_no=1&page_size=5&start_time=${startTime}&end_time=${endTime}`
+  // --- SWR HOOK FOR UNLOCK LOGS ---
+  const unlockLogsSWRKey = firstDeviceId
+    ? `/api/devices/${firstDeviceId}/logs/unlock?page_no=1&page_size=10&start_time=${startTime}&end_time=${endTime}`
     : null;
 
   const {
-    data: logsData,
-    error: logsError,
-    isLoading: logsLoading,
-  } = useSWR<{ result: { logs: UnlockLog[] } }>(logsSWRKey, fetcher);
+    data: unlockLogsData,
+    error: unlockLogsError,
+    isLoading: unlockLogsLoading,
+  } = useSWR<{ result: { logs: UnlockLog[] } }>(unlockLogsSWRKey, fetcher);
 
-  if (devicesLoading || (firstDeviceId && logsLoading)) {
+  // --- NEW: SWR HOOK FOR ALARM LOGS ---
+  const alarmLogsSWRKey = firstDeviceId
+    ? `/api/devices/${firstDeviceId}/logs/alarm?page_no=1&page_size=10`
+    : null;
+
+  const {
+    data: alarmLogsData,
+    error: alarmLogsError,
+    isLoading: alarmLogsLoading,
+  } = useSWR<{ result: { logs: AlarmLog[] } }>(alarmLogsSWRKey, fetcher);
+
+  // --- COMBINE, SORT, AND MEMOIZE EVENT DATA ---
+  const recentEvents = useMemo(() => {
+    const combinedEvents: UnifiedEvent[] = [];
+
+    // Process unlock logs
+    if (unlockLogsData?.result?.logs) {
+      unlockLogsData.result.logs.forEach((log) => {
+        combinedEvents.push({
+          id: `unlock-${log.update_time}`,
+          timestamp: log.update_time,
+          actor: log.nick_name || `User ID: ${log.user_id}`,
+          avatar: log.avatar,
+          event:
+            eventMap[log.status.code] || log.status.code.replace(/_/g, " "),
+          Icon: KeyRound,
+        });
+      });
+    }
+
+    // Process alarm logs
+    if (alarmLogsData?.result?.logs) {
+      alarmLogsData.result.logs.forEach((log) => {
+        const primaryStatus = log.status?.[0];
+        if (primaryStatus) {
+          combinedEvents.push({
+            id: `alarm-${log.update_time}`,
+            timestamp: log.update_time,
+            actor: log.nick_name || "System Alert",
+            event:
+              eventMap[primaryStatus.code] ||
+              primaryStatus.code.replace(/_/g, " "),
+            Icon: ShieldAlert, // Use alarm icon
+          });
+        }
+      });
+    }
+
+    // Sort by most recent and take the top 10
+    return combinedEvents
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 10);
+  }, [unlockLogsData, alarmLogsData]);
+
+  // Update loading state to wait for both log types
+  if (
+    devicesLoading ||
+    (firstDeviceId && (unlockLogsLoading || alarmLogsLoading))
+  ) {
     return <DashboardSkeleton />;
   }
 
@@ -114,9 +198,12 @@ export default function DashboardPage() {
       </div>
     );
   }
-  if (logsError) {
-    console.error("Failed to load activity logs:", logsError);
-  }
+
+  // Log errors for debugging but don't block the UI
+  if (unlockLogsError)
+    console.error("Failed to load unlock logs:", unlockLogsError);
+  if (alarmLogsError)
+    console.error("Failed to load alarm logs:", alarmLogsError);
 
   const devices = devicesData?.result || [];
   const totalLocks = devices.length;
@@ -124,12 +211,14 @@ export default function DashboardPage() {
   const lowBatteryLocks = devices.filter((d) =>
     d.status?.some((s) => s.code === "battery_state" && s.value === "low")
   ).length;
-  const recentEvents = logsData?.result?.logs || [];
+
+  const isLoadingEvents = unlockLogsLoading || alarmLogsLoading;
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Dashboard</h1>
 
+      {/* --- STATS CARDS (Unchanged) --- */}
       <motion.div
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         variants={container}
@@ -178,6 +267,7 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
       </motion.div>
+      {/* --- END OF STATS CARDS --- */}
 
       <Card>
         <CardHeader>
@@ -187,10 +277,11 @@ export default function DashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* --- UPDATED TABLE --- */}
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
+                <TableHead>User / Source</TableHead>
                 <TableHead>Event</TableHead>
                 <TableHead className="text-right">Time</TableHead>
               </TableRow>
@@ -202,44 +293,47 @@ export default function DashboardPage() {
                     colSpan={3}
                     className="text-center h-24 text-muted-foreground"
                   >
-                    {logsLoading
+                    {isLoadingEvents
                       ? "Loading activity..."
                       : "No recent activity to display."}
                   </TableCell>
                 </TableRow>
               ) : (
-                recentEvents.map((e) => {
-                  const friendlyEventName =
-                    eventMap[e.status.code] || e.status.code.replace(/_/g, " ");
-                  return (
-                    <TableRow key={e.update_time}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
+                recentEvents.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {e.avatar ? (
                           <Image
-                            src={e.avatar || "/fallback-avatar.png"}
-                            alt={e.nick_name || "System"}
+                            src={e.avatar}
+                            alt={e.actor}
                             width={24}
                             height={24}
                             className="rounded-full"
                           />
-                          <span>{e.nick_name || `User ID: ${e.user_id}`}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <KeyRound className="h-4 w-4 text-muted-foreground" />
-                          <span>{friendlyEventName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {new Date(e.update_time).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                        ) : (
+                          // A placeholder for events without avatars (like alarms)
+                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center">
+                            <e.Icon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span>{e.actor}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <e.Icon className="h-4 w-4 text-muted-foreground" />
+                        <span>{e.event}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {new Date(e.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
