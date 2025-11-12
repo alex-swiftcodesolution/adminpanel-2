@@ -173,7 +173,7 @@ export default function LocksPage() {
                     className="block"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="relative flex-shrink-0">
+                      <div className="relative shrink-0">
                         {device.icon_url ? (
                           <Image
                             src={device.icon_url}

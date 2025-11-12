@@ -106,7 +106,7 @@ export default function LogDetailDialog({
           {/* User & Time */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="bg-muted rounded-full w-14 h-14 flex items-center justify-center flex-shrink-0">
+              <div className="bg-muted rounded-full w-14 h-14 flex items-center justify-center shrink-0">
                 <User className="h-7 w-7" />
               </div>
               <div>
