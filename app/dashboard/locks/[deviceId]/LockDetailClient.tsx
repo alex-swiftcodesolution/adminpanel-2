@@ -47,7 +47,7 @@ import { fetcher, postApi } from "@/lib/api-client";
 import { eventMap } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import LogDetailDialog from "@/components/ui/LogDetailDialog";
+import LogDetailDialog from "@/components/dialogs/LogDetailDialog";
 
 interface DeviceStatus {
   code: string;

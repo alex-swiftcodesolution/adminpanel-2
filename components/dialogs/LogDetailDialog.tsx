@@ -64,9 +64,12 @@ export default function LogDetailDialog({
     result: { file_url: string };
   }>(
     mediaInfo?.file_key
-      ? `/api/devices/${deviceId}/media?url=${encodeURIComponent(
+      ? /*
+      `/api/devices/${deviceId}/media?url=${encodeURIComponent(
           mediaInfo.file_url
         )}&key=${mediaInfo.file_key}`
+      */
+        `/api/devices/${deviceId}/media?key=${mediaInfo.file_key}`
       : null,
     fetcher,
     { revalidateOnFocus: false }
@@ -184,7 +187,7 @@ export default function LogDetailDialog({
                       loop
                       muted
                       playsInline
-                      className="w-full aspect-video object-contain"
+                      className="w-full aspect-video object-contain rounded-lg"
                     >
                       <source src={signedUrl} type="video/mp4" />
                       Video not supported
