@@ -1,3 +1,4 @@
+// src/components/dialogs/LogDetailDialog.tsx
 "use client";
 
 import {
@@ -12,12 +13,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import {
   BellRing,
+  Image as ImageIcon,
+  Video,
   User,
   Clock,
   AlertTriangle,
-  Image as ImageIcon,
-  Video,
-  X,
 } from "lucide-react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api-client";
@@ -55,7 +55,8 @@ export default function LogDetailDialog({
   onOpenChange,
   deviceId,
 }: LogDetailDialogProps) {
-  const isAlarm = "media_infos" in log || Array.isArray(log.status);
+  const hasMedia = !!log.media_infos?.length;
+  const isAlarm = Array.isArray(log.status) || hasMedia;
   const statusArray = Array.isArray(log.status) ? log.status : [log.status];
   const mediaInfo = log.media_infos?.[0];
 
@@ -64,12 +65,7 @@ export default function LogDetailDialog({
     result: { file_url: string };
   }>(
     mediaInfo?.file_key
-      ? /*
-      `/api/devices/${deviceId}/media?url=${encodeURIComponent(
-          mediaInfo.file_url
-        )}&key=${mediaInfo.file_key}`
-      */
-        `/api/devices/${deviceId}/media?key=${mediaInfo.file_key}`
+      ? `/api/devices/${deviceId}/media?key=${mediaInfo.file_key}`
       : null,
     fetcher,
     { revalidateOnFocus: false }
@@ -79,7 +75,7 @@ export default function LogDetailDialog({
     ? mediaUrlData.result.file_url
     : mediaInfo?.file_url;
 
-  const isVideo = signedUrl?.includes(".mp4");
+  const isVideo = signedUrl?.endsWith(".mp4") ?? false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,14 +90,6 @@ export default function LogDetailDialog({
               )}
               <span>{isAlarm ? "Alarm Event" : "Unlock Event"}</span>
             </DialogTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              className="rounded-full"
-            >
-              <X className="h-5 w-5" />
-            </Button>
           </div>
         </DialogHeader>
 
@@ -164,7 +152,7 @@ export default function LogDetailDialog({
           </div>
 
           {/* Media */}
-          {mediaInfo && (
+          {hasMedia && mediaInfo && (
             <div className="space-y-3">
               <h4 className="font-semibold text-lg flex items-center gap-2">
                 {isVideo ? (

@@ -72,6 +72,7 @@ interface BaseLog {
   update_time: number;
   user_id?: string;
   nick_name?: string;
+  media_infos?: Array<{ file_key: string; file_url: string }>;
 }
 
 interface UnlockLog extends BaseLog {
@@ -80,7 +81,6 @@ interface UnlockLog extends BaseLog {
 
 interface AlarmLog extends BaseLog {
   status: DeviceStatus[] | DeviceStatus;
-  media_infos?: Array<{ file_key: string; file_url: string }>;
 }
 
 type Log = UnlockLog | AlarmLog;
@@ -197,7 +197,7 @@ export default function LockDetailClient({
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Header - Mobile Optimized */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
@@ -236,18 +236,10 @@ export default function LockDetailClient({
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm">
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="users" className="text-xs sm:text-sm">
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="text-xs sm:text-sm">
-            Logs
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="text-xs sm:text-sm">
-            Settings
-          </TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -361,7 +353,6 @@ export default function LockDetailClient({
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {/* Mobile Card View */}
               <div className="block sm:hidden">
                 {usersData?.result?.map((user) => (
                   <div
@@ -411,7 +402,6 @@ export default function LockDetailClient({
                 ))}
               </div>
 
-              {/* Desktop Table */}
               <div className="hidden sm:block overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -489,38 +479,44 @@ export default function LockDetailClient({
                   <CardTitle className="text-lg">Unlock History</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {/* Mobile List */}
                   <div className="block sm:hidden">
                     {unlockLogs?.result?.logs?.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
                         No unlock events in last 7 days
                       </div>
                     ) : (
-                      unlockLogs?.result?.logs?.map((log) => (
-                        <div
-                          key={log.update_time}
-                          onClick={() => openLogDetail(log)}
-                          className="border-b last:border-b-0 p-4 hover:bg-muted/50 cursor-pointer"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-sm">
-                                {log.nick_name || `ID: ${log.user_id}`}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {format(log.update_time, "MMM d, h:mm a")}
-                              </p>
+                      unlockLogs?.result?.logs?.map((log) => {
+                        const hasMedia = !!log.media_infos?.length;
+                        const isAlarm = hasMedia;
+                        return (
+                          <div
+                            key={log.update_time}
+                            onClick={() => openLogDetail(log)}
+                            className="border-b last:border-b-0 p-4 hover:bg-muted/50 cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-sm">
+                                  {log.nick_name || `ID: ${log.user_id}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {format(log.update_time, "MMM d, h:mm a")}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={isAlarm ? "destructive" : "outline"}
+                                className="text-xs"
+                              >
+                                {eventMap[log.status.code] || log.status.code}
+                                {hasMedia && " (Media)"}
+                              </Badge>
                             </div>
-                            <Badge variant="outline" className="text-xs">
-                              {eventMap[log.status.code] || log.status.code}
-                            </Badge>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 
-                  {/* Desktop Table */}
                   <div className="hidden sm:block overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -541,25 +537,35 @@ export default function LockDetailClient({
                             </TableCell>
                           </TableRow>
                         ) : (
-                          unlockLogs?.result?.logs?.map((log) => (
-                            <TableRow
-                              key={log.update_time}
-                              className="cursor-pointer hover:bg-muted/50"
-                              onClick={() => openLogDetail(log)}
-                            >
-                              <TableCell>
-                                {format(log.update_time, "MMM d, h:mm a")}
-                              </TableCell>
-                              <TableCell>
-                                {log.nick_name || `ID: ${log.user_id}`}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  {eventMap[log.status.code] || log.status.code}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          unlockLogs?.result?.logs?.map((log) => {
+                            const hasMedia = !!log.media_infos?.length;
+                            const isAlarm = hasMedia;
+                            return (
+                              <TableRow
+                                key={log.update_time}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => openLogDetail(log)}
+                              >
+                                <TableCell>
+                                  {format(log.update_time, "MMM d, h:mm a")}
+                                </TableCell>
+                                <TableCell>
+                                  {log.nick_name || `ID: ${log.user_id}`}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      isAlarm ? "destructive" : "outline"
+                                    }
+                                  >
+                                    {eventMap[log.status.code] ||
+                                      log.status.code}
+                                    {hasMedia && " (Photo/Video)"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -574,7 +580,6 @@ export default function LockDetailClient({
                   <CardTitle className="text-lg">Alarm Events</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {/* Mobile List */}
                   <div className="block sm:hidden">
                     {alarmLogs?.result?.logs?.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
@@ -612,7 +617,6 @@ export default function LockDetailClient({
                     )}
                   </div>
 
-                  {/* Desktop Table */}
                   <div className="hidden sm:block overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -638,7 +642,6 @@ export default function LockDetailClient({
                               : [log.status];
                             const primaryCode = statusArray[0].code;
                             const hasMedia = !!log.media_infos?.length;
-
                             return (
                               <TableRow
                                 key={log.update_time}

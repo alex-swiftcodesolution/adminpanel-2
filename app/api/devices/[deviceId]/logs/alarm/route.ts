@@ -3,7 +3,6 @@ import { tuyaClient } from "@/lib/tuya-connector";
 
 type AlarmStatusItem = { code: string; value: unknown };
 
-// v1.1 returns status as an array of objects.
 interface AlarmRecord {
   media_infos?: { file_key: string; file_url: string }[];
   nick_name?: string;
@@ -23,7 +22,6 @@ interface TuyaResponse<T> {
   code?: number;
 }
 
-// Per v1.1 docs, these are valid alarm codes
 const DEFAULT_ALARM_CODES = "alarm_lock,hijack,doorbell";
 
 export async function GET(
@@ -35,16 +33,14 @@ export async function GET(
   const url = new URL(request.url);
   const searchParams = url.searchParams;
 
-  // Build query based on the v1.1 documentation
   const query = {
     page_no: searchParams.get("page_no") ?? "1",
     page_size: searchParams.get("page_size") ?? "10",
     codes: searchParams.get("codes") ?? DEFAULT_ALARM_CODES,
-    show_media_info: searchParams.get("show_media_info") ?? "false", // Required boolean parameter
+    show_media_info: searchParams.get("show_media_info") ?? "true",
   };
 
   try {
-    // Corrected to use the v1.1 endpoint
     const response = await tuyaClient.request<TuyaAlarmResult>({
       method: "GET",
       path: `/v1.1/devices/${deviceId}/door-lock/alarm-logs`,
@@ -62,8 +58,6 @@ export async function GET(
       );
     }
 
-    // v1.1 status is already an array, so no normalization is needed.
-    // The previous normalization logic is kept for safety but is less critical now.
     const logs = (result.records ?? []).map((r) => ({
       ...r,
       status: Array.isArray(r.status) ? r.status : [r.status],
