@@ -2,12 +2,13 @@
 import { NextResponse } from "next/server";
 import { tuyaClient } from "@/lib/tuya-connector";
 
-type RouteContext = {
-  params: Promise<{ deviceId: string; passwordId: string }>;
-};
+// Correct typing for Next.js 16 App Router
+export async function PUT(
+  request: Request,
+  context: { params: { deviceId: string; passwordId: string } }
+) {
+  const { deviceId, passwordId } = context.params;
 
-export async function PUT(request: Request, context: RouteContext) {
-  const { deviceId, passwordId } = await context.params;
   try {
     const response = await tuyaClient.request({
       method: "PUT",
@@ -15,12 +16,14 @@ export async function PUT(request: Request, context: RouteContext) {
     });
 
     const { result, success, msg } = response.data;
+
     if (!success) {
       return NextResponse.json(
         { success: false, message: msg },
         { status: 502 }
       );
     }
+
     return NextResponse.json({ success: true, result });
   } catch (error: unknown) {
     const errorMessage =
