@@ -883,15 +883,17 @@ export default function LockDetailClient({
       )}
 
       {/* Temp-password detail dialog – rendered conditionally */}
-      {selectedTempPass && (
-        <TempPasswordDetailDialog
-          deviceId={deviceId}
-          password={selectedTempPass}
-          open={detailTempOpen}
-          onOpenChange={setDetailTempOpen}
-          onSuccess={mutateTempPass}
-        />
-      )}
+      <Dialog open={detailTempOpen} onOpenChange={setDetailTempOpen}>
+        {selectedTempPass && (
+          <TempPasswordDetailDialog
+            deviceId={deviceId}
+            password={selectedTempPass}
+            open={detailTempOpen}
+            onOpenChange={setDetailTempOpen}
+            onSuccess={mutateTempPass}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }

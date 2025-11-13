@@ -11,8 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { postApi } from "@/lib/api-client";
-import { decryptTicketKey, encryptPasswordWithTicket } from "@/lib/crypto";
-import { TUYA_ACCESS_KEY } from "@/lib/constants";
+import { encryptPasswordWithTicket } from "@/lib/crypto";
 
 interface TempPasswordDialogProps {
   deviceId: string;
@@ -28,58 +27,98 @@ export default function TempPasswordDialog({
     password: "",
     effective_time: "",
     invalid_time: "",
-    type: 0, // 0 = reusable, 1 = one‑time
+    oneTime: false,
+    phone: "",
+    sendSms: false,
   });
+
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleCreatePassword = async () => {
     if (
       !form.name ||
       !form.password ||
       !form.effective_time ||
       !form.invalid_time
     ) {
-      return toast.error("All fields are required");
+      return toast.error(
+        "Name, password, start time, and end time are required"
+      );
+    }
+
+    // Validate password length (7 for Wi-Fi locks)
+    if (form.password.length !== 7) {
+      return toast.error(
+        "Password must be exactly 7 characters for Wi-Fi locks"
+      );
     }
 
     setLoading(true);
+
     try {
-      // 1. Get ticket
+      // 1️⃣ Get ticket from server
       const ticketRes = await fetch(
         `/api/devices/${deviceId}/password-ticket`,
         { method: "POST" }
       );
       const ticketJson = await ticketRes.json();
-      if (!ticketJson.success) throw new Error(ticketJson.message);
 
-      const { ticket_id, ticket_key } = ticketJson.result;
+      if (!ticketJson.success || !ticketJson.result?.plainTicketKey) {
+        throw new Error(ticketJson.message || "Failed to get ticket");
+      }
 
-      // 2. Decrypt ticket_key
-      const plainTicketKey = decryptTicketKey(ticket_key, TUYA_ACCESS_KEY);
+      const { plainTicketKey, ticket_id } = ticketJson.result;
 
-      // 3. Encrypt user password
+      // 2️⃣ Encrypt password
       const encryptedPwd = encryptPasswordWithTicket(
         form.password,
         plainTicketKey
+      ).toUpperCase();
+
+      // 3️⃣ Convert times to UNIX seconds
+      const effectiveTs = Math.floor(
+        new Date(form.effective_time).getTime() / 1000
+      );
+      const invalidTs = Math.floor(
+        new Date(form.invalid_time).getTime() / 1000
       );
 
-      // 4. Build payload for temp‑password API
+      // 4️⃣ Build payload for template temp password
       const payload = {
         name: form.name,
         password: encryptedPwd,
-        effective_time: Math.floor(
-          new Date(form.effective_time).getTime() / 1000
-        ),
-        invalid_time: Math.floor(new Date(form.invalid_time).getTime() / 1000),
         password_type: "ticket",
         ticket_id,
-        type: form.type ? 1 : 0,
-        relate_dev_list: [deviceId],
+        effective_time: effectiveTs,
+        invalid_time: invalidTs,
+        type: form.oneTime ? 1 : 0,
+        phone: form.phone || undefined,
+        check_name: true,
+        is_record: true,
       };
 
-      await postApi(`/api/devices/${deviceId}/temp-password`, payload);
-      toast.success("Temporary password created");
+      // 5️⃣ Post to API
+      const response = await postApi(
+        `/api/devices/${deviceId}/temp-password`,
+        payload
+      );
+
+      toast.success(
+        `Temporary password created successfully${
+          response.result?.pwd_id ? ` (ID: ${response.result.pwd_id})` : ""
+        }`
+      );
+
       onSuccess();
+      setForm({
+        name: "",
+        password: "",
+        effective_time: "",
+        invalid_time: "",
+        oneTime: false,
+        phone: "",
+        sendSms: false,
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create password");
     } finally {
@@ -100,17 +139,23 @@ export default function TempPasswordDialog({
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Guest Access"
+            disabled={loading}
           />
         </div>
 
         <div>
-          <Label>Password</Label>
+          <Label>Password (7 characters)</Label>
           <Input
-            type="password"
+            type="text"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="Enter password"
+            placeholder="1234567"
+            maxLength={7}
+            disabled={loading}
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            Must be exactly 7 characters
+          </p>
         </div>
 
         <div>
@@ -121,6 +166,7 @@ export default function TempPasswordDialog({
             onChange={(e) =>
               setForm({ ...form, effective_time: e.target.value })
             }
+            disabled={loading}
           />
         </div>
 
@@ -130,26 +176,44 @@ export default function TempPasswordDialog({
             type="datetime-local"
             value={form.invalid_time}
             onChange={(e) => setForm({ ...form, invalid_time: e.target.value })}
+            disabled={loading}
           />
+        </div>
+
+        <div>
+          <Label>Phone Number (optional)</Label>
+          <Input
+            type="tel"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            placeholder="+1234567890"
+            disabled={loading}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            For SMS notifications (if supported)
+          </p>
         </div>
 
         <div className="flex items-center space-x-2">
           <input
             type="checkbox"
             id="one-time"
-            checked={form.type === 1}
-            onChange={(e) =>
-              setForm({ ...form, type: e.target.checked ? 1 : 0 })
-            }
+            checked={form.oneTime}
+            onChange={(e) => setForm({ ...form, oneTime: e.target.checked })}
             className="rounded"
+            disabled={loading}
           />
           <Label htmlFor="one-time" className="cursor-pointer">
-            One‑time use only
+            One-time use only
           </Label>
         </div>
 
-        <Button onClick={handleSubmit} disabled={loading} className="w-full">
-          {loading ? "Creating…" : "Create Password"}
+        <Button
+          onClick={handleCreatePassword}
+          disabled={loading}
+          className="w-full"
+        >
+          {loading ? "Creating password…" : "Create Password"}
         </Button>
       </div>
     </DialogContent>
