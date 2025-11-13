@@ -1,4 +1,4 @@
-// src/app/api/devices/[deviceId]/credentials/unassigned/route.ts  ← NEW
+// src/app/api/devices/[deviceId]/credentials/unassigned/route.ts
 import { NextResponse } from "next/server";
 import { tuyaClient } from "@/lib/tuya-connector";
 
@@ -8,16 +8,17 @@ export async function GET(
 ) {
   const { deviceId } = await context.params;
   const { searchParams } = new URL(request.url);
-  const unlock_type = searchParams.get("unlock_type") || ""; // Optional filter
+  const unlock_type = searchParams.get("unlock_type");
 
   try {
-    const params: any = {};
-    if (unlock_type) params.unlock_type = unlock_type;
+    let path = `/v1.0/devices/${deviceId}/door-lock/unassigned-keys`;
+    if (unlock_type) {
+      path += `?unlock_type=${encodeURIComponent(unlock_type)}`;
+    }
 
     const response = await tuyaClient.request({
       method: "GET",
-      path: `/v1.0/devices/${deviceId}/door-lock/unassigned-keys`,
-      params, // Query params
+      path,
     });
 
     const { result, success, msg } = response.data;
