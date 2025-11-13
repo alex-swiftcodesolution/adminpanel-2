@@ -38,4 +38,17 @@ export const eventMap: Record<string, string> = {
   doorbell: "Doorbell Pressed",
 
   wrong_password: "Wrong Password",
+
+  unlock_success: "Unlocked",
+  unlock_failed: "Failed",
+};
+
+export const phaseMap: Record<string, string> = {
+  "1": "Pending",
+  "2": "Active",
+  "3": "Frozen",
+  "4": "Deleted",
+  "5": "Failed",
+  "0": "Deleted",
+  "7": "Failed",
 };

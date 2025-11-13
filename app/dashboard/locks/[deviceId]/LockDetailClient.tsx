@@ -1,4 +1,3 @@
-// src/app/dashboard/locks/[deviceId]/LockDetailClient.tsx
 "use client";
 
 import { useState } from "react";
@@ -41,13 +40,17 @@ import {
   BellRing,
   Wifi,
   WifiOff,
+  Plus,
 } from "lucide-react";
 import useSWR from "swr";
 import { fetcher, postApi } from "@/lib/api-client";
-import { eventMap } from "@/lib/utils";
+import { eventMap, phaseMap } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import LogDetailDialog from "@/components/dialogs/LogDetailDialog";
+import TempPasswordDialog from "@/components/dialogs/TempPasswordDialog";
+import TempPasswordDetailDialog from "@/components/dialogs/TempPasswordDetailDialog";
+import TempPasswordRow from "@/components/TempPasswordRow";
 
 interface DeviceStatus {
   code: string;
@@ -85,6 +88,18 @@ interface AlarmLog extends BaseLog {
 
 type Log = UnlockLog | AlarmLog;
 
+export interface TempPassword {
+  id: number;
+  name?: string;
+  phase: number | string;
+  effective_time: number;
+  invalid_time: number;
+  phone?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Constants                                 */
+/* -------------------------------------------------------------------------- */
 const endTime = Date.now();
 const startTime = endTime - 7 * 24 * 60 * 60 * 1000;
 
@@ -95,12 +110,21 @@ export default function LockDetailClient({
   deviceId: string;
   initialDevice: TuyaDevice;
 }) {
+  /* ------------------------------- UI State ------------------------------- */
   const [unlockLoading, setUnlockLoading] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({ nick_name: "", sex: "male" });
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
+  // Temp-password UI state
+  const [tempPassOpen, setTempPassOpen] = useState(false);
+  const [selectedTempPass, setSelectedTempPass] = useState<TempPassword | null>(
+    null
+  );
+  const [detailTempOpen, setDetailTempOpen] = useState(false);
+
+  /* --------------------------------- SWR --------------------------------- */
   const { data: deviceData } = useSWR<{ result: TuyaDevice }>(
     `/api/devices/${deviceId}/details`,
     fetcher,
@@ -116,6 +140,10 @@ export default function LockDetailClient({
     fetcher
   );
 
+  const { data: tempPassData, mutate: mutateTempPass } = useSWR<{
+    result: TempPassword[];
+  }>(`/api/devices/${deviceId}/temp-passwords?valid=true`, fetcher);
+
   const unlockUrl = `/api/devices/${deviceId}/logs/unlock?page_no=1&page_size=20&start_time=${startTime}&end_time=${endTime}`;
   const alarmUrl = `/api/devices/${deviceId}/logs/alarm?page_no=1&page_size=10&start_time=${startTime}&end_time=${endTime}`;
 
@@ -128,6 +156,7 @@ export default function LockDetailClient({
     fetcher
   );
 
+  /* ----------------------------- Derived State ---------------------------- */
   const device = deviceData?.result || initialDevice;
   const statusMap = Object.fromEntries(
     statusData?.result?.map((s) => [s.code, s.value]) || []
@@ -137,6 +166,7 @@ export default function LockDetailClient({
   const isLocked =
     statusMap.lock_state === "locked" || statusMap.door_state === "closed";
 
+  /* ------------------------------- Handlers ------------------------------- */
   const handleRemoteUnlock = async () => {
     setUnlockLoading(true);
     try {
@@ -195,9 +225,26 @@ export default function LockDetailClient({
     setDetailOpen(true);
   };
 
+  const handleClearAllTempPasswords = async () => {
+    if (!confirm("Clear ALL temporary passwords?")) return;
+    try {
+      await postApi(
+        `/api/devices/${deviceId}/temp-passwords/reset-password`,
+        {}
+      );
+      toast.success("All temporary passwords cleared");
+      mutateTempPass();
+    } catch {
+      toast.error("Clear failed");
+    }
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /*                                   UI                                      */
+  /* -------------------------------------------------------------------------- */
   return (
     <div className="space-y-6 pb-8">
-      {/* Header */}
+      {/* ------------------------------- Header ------------------------------- */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
@@ -234,14 +281,17 @@ export default function LockDetailClient({
         </div>
       </div>
 
+      {/* -------------------------------- Tabs -------------------------------- */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="temp-passwords">Temp Passwords</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
+        {/* ----------------------------- Overview ----------------------------- */}
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Card>
@@ -298,6 +348,7 @@ export default function LockDetailClient({
           </div>
         </TabsContent>
 
+        {/* ------------------------------- Users ------------------------------- */}
         <TabsContent value="users">
           <Card>
             <CardHeader className="pb-3">
@@ -352,7 +403,9 @@ export default function LockDetailClient({
                 </Dialog>
               </div>
             </CardHeader>
+
             <CardContent className="p-0">
+              {/* Mobile */}
               <div className="block sm:hidden">
                 {usersData?.result?.map((user) => (
                   <div
@@ -402,6 +455,7 @@ export default function LockDetailClient({
                 ))}
               </div>
 
+              {/* Desktop */}
               <div className="hidden sm:block overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -466,6 +520,136 @@ export default function LockDetailClient({
           </Card>
         </TabsContent>
 
+        {/* -------------------------- Temporary Passwords -------------------------- */}
+        <TabsContent value="temp-passwords">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-lg">Temporary Passwords</CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleClearAllTempPasswords}
+                  >
+                    Clear All
+                  </Button>
+
+                  <Dialog open={tempPassOpen} onOpenChange={setTempPassOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" /> Add Temp Password
+                      </Button>
+                    </DialogTrigger>
+
+                    {/* TempPasswordDialog is the content */}
+                    <TempPasswordDialog
+                      deviceId={deviceId}
+                      onSuccess={() => {
+                        setTempPassOpen(false);
+                        mutateTempPass();
+                        toast.success("Temp password created");
+                      }}
+                    />
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {/* Mobile */}
+              <div className="block sm:hidden">
+                {tempPassData?.result?.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    No temporary passwords
+                  </div>
+                ) : (
+                  tempPassData?.result?.map((p) => (
+                    <TempPasswordRow
+                      key={p.id}
+                      password={p}
+                      onClick={() => {
+                        setSelectedTempPass(p);
+                        setDetailTempOpen(true);
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Desktop */}
+              <div className="hidden sm:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Valid Period</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tempPassData?.result?.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground py-8"
+                        >
+                          No temporary passwords
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      tempPassData?.result?.map((p) => (
+                        <TableRow
+                          key={p.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => {
+                            setSelectedTempPass(p);
+                            setDetailTempOpen(true);
+                          }}
+                        >
+                          <TableCell>{p.name || "Unnamed"}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                p.phase === 2
+                                  ? "default"
+                                  : p.phase === 3
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
+                              {phaseMap[p.phase] || p.phase}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(p.effective_time * 1000, "PP p")} –{" "}
+                            {format(p.invalid_time * 1000, "PP p")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTempPass(p);
+                                setDetailTempOpen(true);
+                              }}
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* -------------------------------- Logs -------------------------------- */}
         <TabsContent value="logs">
           <Tabs defaultValue="unlock">
             <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -479,6 +663,7 @@ export default function LockDetailClient({
                   <CardTitle className="text-lg">Unlock History</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {/* Mobile */}
                   <div className="block sm:hidden">
                     {unlockLogs?.result?.logs?.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
@@ -517,6 +702,7 @@ export default function LockDetailClient({
                     )}
                   </div>
 
+                  {/* Desktop */}
                   <div className="hidden sm:block overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -580,6 +766,7 @@ export default function LockDetailClient({
                   <CardTitle className="text-lg">Alarm Events</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {/* Mobile */}
                   <div className="block sm:hidden">
                     {alarmLogs?.result?.logs?.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
@@ -617,6 +804,7 @@ export default function LockDetailClient({
                     )}
                   </div>
 
+                  {/* Desktop */}
                   <div className="hidden sm:block overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -669,6 +857,7 @@ export default function LockDetailClient({
           </Tabs>
         </TabsContent>
 
+        {/* ------------------------------ Settings ------------------------------ */}
         <TabsContent value="settings">
           <Card>
             <CardHeader>
@@ -683,12 +872,24 @@ export default function LockDetailClient({
         </TabsContent>
       </Tabs>
 
+      {/* ------------------------------- Dialogs ------------------------------- */}
       {selectedLog && (
         <LogDetailDialog
           log={selectedLog}
           open={detailOpen}
           onOpenChange={setDetailOpen}
           deviceId={deviceId}
+        />
+      )}
+
+      {/* Temp-password detail dialog – rendered conditionally */}
+      {selectedTempPass && (
+        <TempPasswordDetailDialog
+          deviceId={deviceId}
+          password={selectedTempPass}
+          open={detailTempOpen}
+          onOpenChange={setDetailTempOpen}
+          onSuccess={mutateTempPass}
         />
       )}
     </div>
