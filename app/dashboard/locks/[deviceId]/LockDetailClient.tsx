@@ -36,7 +36,6 @@ import {
   Unlock,
   Key,
   UserPlus,
-  Trash2,
   BellRing,
   Wifi,
   WifiOff,
@@ -51,6 +50,7 @@ import LogDetailDialog from "@/components/dialogs/LogDetailDialog";
 import TempPasswordDialog from "@/components/dialogs/TempPasswordDialog";
 import TempPasswordDetailDialog from "@/components/dialogs/TempPasswordDetailDialog";
 import TempPasswordRow from "@/components/TempPasswordRow";
+import UserDetailDialog from "@/components/dialogs/UserDetailDialog";
 
 interface DeviceStatus {
   code: string;
@@ -103,6 +103,118 @@ export interface TempPassword {
 const endTime = Date.now();
 const startTime = endTime - 7 * 24 * 60 * 60 * 1000;
 
+/* -------------------------------------------------------------------------- */
+/*                               Helper Row Components                         */
+/* -------------------------------------------------------------------------- */
+function UserRowMobile({
+  user,
+  deviceId,
+  onRefresh,
+}: {
+  user: User;
+  deviceId: string;
+  onRefresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        onClick={() => setOpen(true)}
+        className="border-b last:border-b-0 p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-muted/50"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-sm font-medium">
+            {user.nick_name[0] || "?"}
+          </div>
+          <div className="min-w-0">
+            <p className="font-medium truncate">
+              {user.nick_name || "Unnamed"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user.user_id}
+            </p>
+          </div>
+        </div>
+        <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+          {user.role}
+        </Badge>
+      </div>
+
+      <UserDetailDialog
+        deviceId={deviceId}
+        user={user}
+        open={open}
+        onOpenChange={setOpen}
+        onDelete={onRefresh}
+      />
+    </>
+  );
+}
+
+function UserRowDesktop({
+  user,
+  deviceId,
+  onRefresh,
+}: {
+  user: User;
+  deviceId: string;
+  onRefresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => setOpen(true)}
+      >
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-xs">
+              {user.nick_name[0] || "?"}
+            </div>
+            <div>
+              <div className="font-medium">{user.nick_name || "Unnamed"}</div>
+              <div className="text-sm text-muted-foreground">
+                {user.user_id}
+              </div>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+            {user.role}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(true);
+            }}
+          >
+            Manage
+          </Button>
+        </TableCell>
+      </TableRow>
+
+      <UserDetailDialog
+        deviceId={deviceId}
+        user={user}
+        open={open}
+        onOpenChange={setOpen}
+        onDelete={onRefresh}
+      />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               Main Component                               */
+/* -------------------------------------------------------------------------- */
 export default function LockDetailClient({
   deviceId,
   initialDevice,
@@ -116,8 +228,6 @@ export default function LockDetailClient({
   const [newUser, setNewUser] = useState({ nick_name: "", sex: "male" });
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-
-  // Temp-password UI state
   const [tempPassOpen, setTempPassOpen] = useState(false);
   const [selectedTempPass, setSelectedTempPass] = useState<TempPassword | null>(
     null
@@ -193,38 +303,12 @@ export default function LockDetailClient({
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Delete this user?")) return;
-    try {
-      await fetch(`/api/devices/${deviceId}/users/${userId}`, {
-        method: "DELETE",
-      });
-      toast.success("User deleted");
-      mutateUsers();
-    } catch {
-      toast.error("Delete failed");
-    }
-  };
-
-  const handleRoleChange = async (userId: string, role: "admin" | "normal") => {
-    try {
-      await fetch(`/api/devices/${deviceId}/users/${userId}/actions/role`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      });
-      toast.success("Role updated");
-      mutateUsers();
-    } catch {
-      toast.error("Update failed");
-    }
-  };
-
   const openLogDetail = (log: Log) => {
     setSelectedLog(log);
     setDetailOpen(true);
   };
 
+  /*
   const handleClearAllTempPasswords = async () => {
     if (!confirm("Clear ALL temporary passwords?")) return;
     try {
@@ -238,6 +322,7 @@ export default function LockDetailClient({
       toast.error("Clear failed");
     }
   };
+  */
 
   /* -------------------------------------------------------------------------- */
   /*                                   UI                                      */
@@ -283,12 +368,11 @@ export default function LockDetailClient({
 
       {/* -------------------------------- Tabs -------------------------------- */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="temp-passwords">Temp Passwords</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         {/* ----------------------------- Overview ----------------------------- */}
@@ -408,50 +492,12 @@ export default function LockDetailClient({
               {/* Mobile */}
               <div className="block sm:hidden">
                 {usersData?.result?.map((user) => (
-                  <div
+                  <UserRowMobile
                     key={user.user_id}
-                    className="border-b last:border-b-0 p-4 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-sm font-medium">
-                        {user.nick_name[0] || "?"}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">
-                          {user.nick_name || "Unnamed"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {user.user_id}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={user.role}
-                        onValueChange={(v) =>
-                          handleRoleChange(
-                            user.user_id,
-                            v as "admin" | "normal"
-                          )
-                        }
-                      >
-                        <SelectTrigger className="w-24 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteUser(user.user_id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    user={user}
+                    deviceId={deviceId}
+                    onRefresh={mutateUsers}
+                  />
                 ))}
               </div>
 
@@ -467,51 +513,12 @@ export default function LockDetailClient({
                   </TableHeader>
                   <TableBody>
                     {usersData?.result?.map((user) => (
-                      <TableRow key={user.user_id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-muted rounded-full w-10 h-10 flex items-center justify-center text-xs">
-                              {user.nick_name[0] || "?"}
-                            </div>
-                            <div>
-                              <div className="font-medium">
-                                {user.nick_name || "Unnamed"}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {user.user_id}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={user.role}
-                            onValueChange={(v) =>
-                              handleRoleChange(
-                                user.user_id,
-                                v as "admin" | "normal"
-                              )
-                            }
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="normal">Normal</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteUser(user.user_id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                      <UserRowDesktop
+                        key={user.user_id}
+                        user={user}
+                        deviceId={deviceId}
+                        onRefresh={mutateUsers}
+                      />
                     ))}
                   </TableBody>
                 </Table>
@@ -527,13 +534,13 @@ export default function LockDetailClient({
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <CardTitle className="text-lg">Temporary Passwords</CardTitle>
                 <div className="flex gap-2">
-                  <Button
+                  {/* <Button
                     size="sm"
                     variant="outline"
                     onClick={handleClearAllTempPasswords}
                   >
                     Clear All
-                  </Button>
+                  </Button> */}
 
                   <Dialog open={tempPassOpen} onOpenChange={setTempPassOpen}>
                     <DialogTrigger asChild>
@@ -542,7 +549,6 @@ export default function LockDetailClient({
                       </Button>
                     </DialogTrigger>
 
-                    {/* TempPasswordDialog is the content */}
                     <TempPasswordDialog
                       deviceId={deviceId}
                       onSuccess={() => {
@@ -856,20 +862,6 @@ export default function LockDetailClient({
             </TabsContent>
           </Tabs>
         </TabsContent>
-
-        {/* ------------------------------ Settings ------------------------------ */}
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Device Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Advanced settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* ------------------------------- Dialogs ------------------------------- */}
@@ -882,7 +874,6 @@ export default function LockDetailClient({
         />
       )}
 
-      {/* Temp-password detail dialog – rendered conditionally */}
       <Dialog open={detailTempOpen} onOpenChange={setDetailTempOpen}>
         {selectedTempPass && (
           <TempPasswordDetailDialog
