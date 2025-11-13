@@ -41,7 +41,6 @@ import {
   BellRing,
   Wifi,
   WifiOff,
-  MoreVertical,
 } from "lucide-react";
 import useSWR from "swr";
 import { fetcher, postApi } from "@/lib/api-client";
